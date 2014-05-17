@@ -1,1 +1,1 @@
-Minehunter is a clone of MineSweeper written so that can practice HTML/JavaScript
+Minehunter is a clone of MineSweeper written so that I can practice HTML/JavaScript
