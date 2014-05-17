@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title> Mine Hunter </title>
+		<script src="./jquery-2.1.1.js"></script>
+		<link rel="stylesheet" type="text/css" href="minestyle.css">
+	</head>
+<body oncontextmenu="return false;">
+	
+	
+
+	<div id="game-board">
+	
+	</div>
+	<div id ="game-counters">
+		<H1>Total Mines: 10 - Mines Remaining: 10</H1>
+	</div>
+
+	
+	<script>
+
+	function init_game() {
+		'use strict';
+
+		//initialize game data object to empty
+		var gameData = {
+
+			moveCount:0,
+			tileArray:[]
+
+		};
+
+		gameData.moves = 0;
+		gameData.flagged = 0;
+		gameData.isOver = false;
+		gameData.revealedCount = 0;
+		gameData.NUM_TILES = 11 * 11;
+		gameData.MINES = 10;
+
+		for (var ii = 0; ii < 11; ii++){
+			gameData.tileArray.push([]);
+
+			for (var jj = 0; jj < 11; jj++) {
+
+				gameData.tileArray[ii].push ({
+					hasMine: false,
+					isRevealed: false,
+					isPressed:false,
+					isFlagged:false,
+					isQuestion:false
+				});
+
+				if (ii < 1 || ii > 9 || jj < 1 || jj > 9) {
+					gameData.tileArray[ii][jj].isRevealed = true;
+					gameData.revealedCount++;
+				}
+
+			}
+		}
+
+		//place mines
+
+		var MAX_MINES = 10;
+		var currentMines = 0;
+		// Game board is 11x11. playable area is 9x9 --> 0 - 81 -> 11 - 92
+		var SCALE = 9;
+		var SHIFT = 1;
+
+		for (currentMines = 0; currentMines < MAX_MINES;) {
+
+			var mine_row = Math.random() * SCALE + SHIFT;
+			mine_row = Math.floor(mine_row);
+
+			var mine_column = Math.random() * SCALE + SHIFT;
+			mine_column = Math.floor(mine_column);
+
+			// TODO: add a counter to prevent the minor chance of infinite looping?
+
+			if ( gameData.tileArray[mine_row][mine_column].hasMine ) {
+
+				//skip iteration and try again
+				continue;
+
+				console.log ("Conflict placing mine, skipping iteration and trying again");
+
+			} else {
+
+				gameData.tileArray[mine_row][mine_column].hasMine = true;
+				++currentMines;
+
+				console.log("Mine placed at row: " + mine_row + " column: " + mine_column);
+
+			}
+
+		}
+	
+		return gameData;
+
+	}
+
+
+	function getNumMines (row, column) {
+		'use strict';
+	//	console.log("Looking for neighbors of " + row + " " + column);
+		row = parseInt(row, 10);
+		column = parseInt(column, 10);
+
+		var neighbors = getNeighbors(row, column);
+
+		var num_mines = 0;
+		while (neighbors.length!== 0 ) {
+
+			var current = neighbors.pop();
+			//console.log("Checking neighbor for mine: " + current.row + " " + current.column);
+			if (window.gameState.tileArray[current.row][current.column].hasMine) {
+				num_mines++;
+				//console.log("Found neighbor with mine: " + current.row + " " + current.column);
+			}
+		}
+
+		return num_mines;
+	}
+
+	function getNeighbors (row, column) {
+
+
+		'use strict';
+
+	//	console.log("Getting neighbors for " + row + " " + column);
+		row = parseInt(row, 10);
+		column = parseInt(column, 10);
+
+		var neighbors = [];
+		var ii, jj;
+
+		for (ii = -1; ii < 2; ii++) {
+
+			var current_row = row + ii;
+
+			if (current_row >= 0 && current_row <= 10 ) {
+
+				for (jj = -1; jj < 2; jj++) {
+					var current_column = column + jj;
+
+					if (current_column >= 0 && current_column <=10) {
+
+						if (!(ii === 0 && jj===0)) {
+
+							//console.log("Found neighbor " + current_row + " " + current_column);
+							neighbors.push( {row: current_row, column: current_column });
+
+						}
+
+					}
+
+				}
+			}
+		}
+
+		return neighbors;
+	}
+
+
+
+	function parseId (e) {
+
+		'use strict';
+		var elementId = e.target.id;
+		
+//		console.log("Parsing id " + elementId);
+		var tokens = elementId.split("-");
+
+		if (tokens.length < 3) { console.log("Error: unexpected split of " + elementId);}
+
+		var column = tokens[tokens.length - 1];
+		var row = tokens[tokens.length -2];
+
+		if (tokens[0] ==="tile") {
+
+			//event occured on the table container rather than the image - remap the id to image
+
+			elementId = "img" + "-" + row + "-" + column;
+
+		}
+
+		var result = { row: row, column: column, id: elementId, elementKey: '#' + elementId, type: tokens[0]};
+		return result;
+	}
+
+	function pressedDown(e) {
+
+		//need to differentiate between right and left click
+
+		'use strict';
+
+		if (window.gameState.isOver) return false;
+
+		var element = parseId(e);
+
+//		if (element.type==="tile") { return;}
+
+	//	console.log("Mouse down on " + e.target.id);
+
+		var tile = window.gameState.tileArray[element.row][element.column];
+		if (tile.isRevealed) { return;}
+		else if (tile.isPressed) { return;}
+		else switch (e.which) {
+
+			case 1:
+
+			if (!tile.isRevealed && !tile.isPressed && !tile.isFlagged && !tile.isQuestion) {
+				window.gameState.tileArray[element.row][element.column].isPressed= true;
+				$(element.elementKey).attr("src", "./pressed.png");
+			}
+			break;
+			case 3:
+
+			if (tile.isFlagged) {
+				window.gameState.tileArray[element.row][element.column].isFlagged= false;
+				window.gameState.tileArray[element.row][element.column].isQuestion= true;
+				window.gameState.flagged--;
+
+				$(element.elementKey).attr("src", "./question.png");
+
+			} else if (tile.isQuestion) {
+				window.gameState.tileArray[element.row][element.column].isQuestion= false;
+				$(element.elementKey).attr("src", "./tile.png");
+			} else {
+				window.gameState.tileArray[element.row][element.column].isFlagged= true;
+				$(element.elementKey).attr("src", "./flagged.png");
+				window.gameState.flagged++;
+
+			}
+
+			}
+	}
+	
+
+	function mouseOut(e) {
+		'use strict';
+
+		if (window.gameState.isOver) return false;
+
+		var element = parseId(e);
+		
+	//	console.log("Mouse leave " + e.target.id);
+
+
+		var tile = window.gameState.tileArray[element.row][element.column];
+
+		if (tile.isPressed && !tile.isRevealed) {
+			
+			$(element.elementKey).attr("src", "./tile.png");
+			window.gameState.tileArray[element.row][element.column].isPressed = false;			
+		}
+
+	}
+
+	function remap_mine(row, column) {
+
+		console.log("Remapped mine to avoid loss on first move");
+		window.gameState.tileArray[row][column].hasMine = false;
+
+
+		for (ii = 1; ii < 10; ii++) {
+			for (jj = 1; jj < 10; jj++) {
+
+				if (!window.gameState.tileArray[ii][jj].hasMine) {
+					window.gameState.tileArray[ii][jj].hasMine = true;
+					return;
+				} else {
+					continue;
+				}
+			}
+		}
+
+
+	}
+
+	function reveal_all() {
+
+		var ii, jj;
+		for (ii = 1; ii < 10; ii++) {
+			for(jj = 1; jj < 10; jj++) {
+
+				if (!window.gameState.tileArray[ii][jj].isRevealed) {
+
+					if (window.gameState.tileArray[ii][jj].isFlagged) {
+
+						if (window.gameState.tileArray[ii][jj].hasMine) {
+							
+							//show mine for correctly flagged
+							$("#img-" + ii + "-" + jj).attr("src", "./mineflagged.png");
+							window.gameState.tileArray[ii][jj].isRevealed = true;
+						} else {
+							$("#img-" + ii + "-" + jj).attr("src", "./flaggedmissed.png");
+							window.gameState.tileArray[ii][jj].isRevealed = true;
+						}
+					} else if (window.gameState.tileArray.isQuestion) {
+
+						if (window.gameState.tileArray[ii][jj].hasMine) {
+							
+							$("#img-" + ii + "-" + jj).attr("src", "./mine.png");
+							window.gameState.tileArray[ii][jj].isRevealed = true;
+
+						} else {
+							//no change
+						} 
+
+					} else {
+
+						if (window.gameState.tileArray[ii][jj].hasMine) {
+							
+							$("#img-" + ii + "-" + jj).attr("src", "./mine.png");
+							window.gameState.tileArray[ii][jj].isRevealed = true;
+						} else {
+							//no change
+						} 
+					}
+				}
+
+			}
+		}
+	}
+
+	function isWin() {
+
+		var ii, jj;
+		var remaining = 0;
+		for (ii =1; ii < 10; ii++) {
+			for (jj=1; jj < 10; jj++) {
+				if (!window.gameState.tileArray[ii][jj].isRevealed) remaining++;
+
+				if (remaining > 10) break;
+			}
+
+			if (remaining > 10) break;
+		}
+
+		if (remaining == 10) {
+			console.log("YOU WIN!"); return true;
+		} else  {
+			return false;
+		} 
+
+	}
+
+	function mouseUp(e) {
+		'use strict';
+		if (window.gameState.isOver) return false;
+
+
+		var element = parseId(e);
+
+
+
+		var tile = window.gameState.tileArray[element.row][element.column];
+
+		var image_path;
+		if(tile.isPressed) {
+			window.gameState.moves++;
+
+
+			if (tile.hasMine === true) {
+
+				if (window.gameState.moves === 1) {
+					remap_mine(element.row, element.column);
+					
+				} else {
+
+					$(element.elementKey).attr("src", "./minered.png");
+					window.gameState.revealedCount++;
+					reveal_all();
+					window.gameState.isOver = true;
+					
+					return;
+
+				}
+
+			} 
+
+			var num_mines = getNumMines(element.row, element.column);
+			console.log("Number of adjacent mines " + num_mines);
+			
+			if (num_mines === 0) {
+				console.log("Flood fill! Woo!")
+				var queue = [];
+				queue.push( {row: element.row, column: element.column});
+
+				while (queue.length !== 0) {
+
+					var popped = queue.pop();
+
+					if (window.gameState.tileArray[popped.row][popped.column].isRevealed) {continue;}
+					$("#img-" + popped.row + "-" + popped.column).attr("src", "./cleared.png");
+					window.gameState.tileArray[popped.row][popped.column].isRevealed = true;
+					window.gameState.revealedCount++;
+
+
+					var neighbors = getNeighbors(popped.row, popped.column);
+					var neighbor;
+					var neighbordata;
+					
+
+					while (neighbors.length != 0) {
+
+						neighbor = neighbors.pop();
+						neighbordata = window.gameState.tileArray[neighbor.row][neighbor.column];
+
+						if (neighbordata.isRevealed || neighbordata.isQuestion || neighbordata.isFlagged || neighbordata.hasMine) {
+							continue;
+
+						} else {
+
+
+							var adjacent_mines = getNumMines(neighbor.row, neighbor.column);
+
+							if (adjacent_mines === 0) {
+
+								queue.push({row: neighbor.row, column: neighbor.column});
+								
+								
+							} else {
+								
+								window.gameState.tileArray[neighbor.row][neighbor.column].isRevealed = true;
+								window.gameState.revealedCount++;
+								image_path = "./" + adjacent_mines + ".png";
+								$("#img-"+ neighbor.row + "-" + neighbor.column).attr("src", image_path);
+							}
+						}
+
+					}
+
+				}
+
+			} else {
+				window.gameState.tileArray[element.row][element.column].isRevealed = true;
+				window.gameState.revealedCount++;
+				image_path = "./" + num_mines + ".png";
+				$(element.elementKey).attr("src", image_path);
+
+			}
+
+			
+		}	
+
+
+		if (isWin()) {
+			setTimeout(	function () {alert("You win!!!!!111!!!!!");}, 500);
+		}
+
+
+	}
+	
+	function init_display () {
+		'use strict';
+
+		var tableString = "<table id=\"tile-table\"></table>";
+		$("#game-board").append(tableString);
+
+		for (var ii = 1; ii < 10; ii++) {
+
+		//	console.log('Loop ' + ii);
+			$("#tile-table").append("<tr id=\"tile-row" + ii +"\"></tr>");
+
+			for (var jj = 1; jj < 10; jj++) {
+
+				$("#tile-row" + ii).append("<td id=\"tile" + "-" + ii + "-" +jj + "\"><img id=\"img-"+ii + "-" + jj+ "\" src=\"tile.png\"></td>");
+
+				var tileKey = "#tile" + "-" +  ii + "-" + jj;
+				$(tileKey).mouseleave(function(e) { mouseOut(e);} );
+				$(tileKey).mousedown (function(e ) { pressedDown (e);} );
+				$(tileKey).mouseup (function(e) { mouseUp(e);} );
+
+			}
+		}
+
+		$("img").bind('dragstart', function(){
+			return false; 
+		});
+	}
+
+
+	window.gameState = init_game();
+	init_display();
+
+	</script>
+</body>
+</html>
+
